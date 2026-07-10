@@ -1,3 +1,4 @@
+import { Prisma } from '@prisma/client';
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 
@@ -15,7 +16,7 @@ export class ActivityService {
     payload: Record<string, unknown> = {},
   ) {
     return this.prisma.customerActivityEvent.create({
-      data: { organizationId, sessionId, eventType: eventType as any, customerId, payload },
+      data: { organizationId, sessionId, eventType: eventType as any, customerId, payload: payload as Prisma.InputJsonValue },
     });
   }
 }
