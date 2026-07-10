@@ -8,40 +8,90 @@ ok()  { echo -e "${GREEN}[✓]${NC} $1"; }
 err() { echo -e "${RED}[✗]${NC} $1"; exit 1; }
 
 cd "$APP_DIR"
-[ -f "package.json" ] || err "No se encontró package.json"
+FILE="src/redis/redis.service.ts"
+[ -f "$FILE" ] || err "No se encontró $FILE"
 
-log "Corrigiendo start/start:prod → node dist/main.js..."
-node -e "
-  const fs = require('fs');
-  const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'));
-  pkg.scripts.start = 'node dist/main.js';
-  pkg.scripts['start:prod'] = 'node dist/main.js';
-  fs.writeFileSync('package.json', JSON.stringify(pkg, null, 2) + '\n');
-"
-ok "package.json corregido"
+log "Reescribiendo $FILE con guard de REDIS_ENABLED..."
 
-log "Recompilando desde cero para confirmar la ruta real..."
-rm -rf dist
+cat > "$FILE" << 'EOF'
+import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
+import Redis from 'ioredis';
+
+// REDIS_ENABLED=true  → se conecta normalmente (requiere REDIS_URL válida).
+// REDIS_ENABLED=false (o ausente) → no-op total: nunca intenta conectar,
+// get() siempre devuelve null (cache-miss), set()/del() no hacen nada.
+// Útil en fase de prueba cuando todavía no hay Redis provisionado para este servicio.
+const REDIS_ENABLED = process.env['REDIS_ENABLED'] === 'true';
+
+@Injectable()
+export class RedisService implements OnModuleInit, OnModuleDestroy {
+  private readonly logger = new Logger(RedisService.name);
+  private client: Redis | null = null;
+
+  onModuleInit(): void {
+    if (!REDIS_ENABLED) {
+      this.logger.warn(
+        'Redis deshabilitado (REDIS_ENABLED != true) — cache en modo no-op',
+      );
+      return;
+    }
+
+    this.client = new Redis(process.env['REDIS_URL'] ?? 'redis://localhost:6379', {
+      lazyConnect: true,
+      maxRetriesPerRequest: 3,
+      retryStrategy: (retries) => (retries > 10 ? null : Math.min(retries * 200, 10_000)),
+    });
+    this.client.on('error', (err) => this.logger.error('Redis error', err));
+  }
+
+  async onModuleDestroy(): Promise<void> {
+    if (this.client) await this.client.quit();
+  }
+
+  async get(key: string): Promise<string | null> {
+    if (!REDIS_ENABLED || !this.client) return null;
+    return this.client.get(key);
+  }
+
+  async set(key: string, value: string, ttlSeconds: number): Promise<void> {
+    if (!REDIS_ENABLED || !this.client) return;
+    await this.client.set(key, value, 'EX', ttlSeconds);
+  }
+
+  async del(key: string): Promise<void> {
+    if (!REDIS_ENABLED || !this.client) return;
+    await this.client.del(key);
+  }
+}
+EOF
+ok "$FILE reescrito con guard de REDIS_ENABLED"
+
+# ─── Documentar la var si hay .env.example ──────────────────────────────────
+if [ -f ".env.example" ]; then
+  if ! grep -q "^REDIS_ENABLED=" .env.example; then
+    cat >> .env.example << 'EOF'
+
+# ─── Redis (cache de org-access) ───────────────────────────────────────────
+# REDIS_ENABLED=true  → cache activo (requiere REDIS_URL configurada).
+# REDIS_ENABLED=false (o ausente) → no-op, sin intentos de conexión.
+REDIS_ENABLED=false
+EOF
+    ok ".env.example actualizado"
+  fi
+fi
+
+log "Recompilando para validar..."
+rm -f *.tsbuildinfo
 pnpm run build
 
 if [ -f "dist/main.js" ]; then
-  ok "dist/main.js confirmado"
+  ok "Build OK — dist/main.js generado"
 else
-  echo -e "${RED}Estructura actual de dist/:${NC}"
-  find dist -maxdepth 2
-  err "dist/main.js sigue sin aparecer donde se espera"
-fi
-
-log "Probando arranque local (3s, luego se corta)..."
-node dist/main.js &
-PID=$!
-sleep 3
-if kill -0 "$PID" 2>/dev/null; then
-  ok "Levantó correctamente"
-  kill "$PID" 2>/dev/null || true
-else
-  echo -e "${YELLOW}[!]${NC} El proceso terminó antes de los 3s — revisá el log de arriba (puede ser falta de DATABASE_URL local, no necesariamente un error del fix)"
+  err "El build no generó dist/main.js — revisar output de arriba"
 fi
 
 echo ""
-echo -e "${GREEN}✅ Listo — commiteá package.json y redeployá en Railway${NC}"
+echo -e "${GREEN}✅ RedisService ahora respeta REDIS_ENABLED${NC}"
+echo ""
+echo "Commiteá y pusheá, y en Railway agregá la variable:"
+echo "  REDIS_ENABLED=false   (mientras no tengas Redis provisionado para este servicio)"
