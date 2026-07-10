@@ -1,12 +1,12 @@
 // prisma/schema.prisma — real-ecommerce-back
 // Ver detalle de decisiones en el mensaje que acompañó este script.
 generator client {
-  provider = "prisma-client-js"
+  provider   = "prisma-client-js"
+  engineType = "client"
 }
 
 datasource db {
   provider = "postgresql"
-  url      = env("DATABASE_URL")
 }
 
 model Category {
