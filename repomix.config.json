@@ -1,0 +1,34 @@
+{
+  "$schema": "https://repomix.com/repomix-config.schema.json",
+  "output": {
+    "filePath": "real-ecommerce-back.xml",
+    "style": "markdown",
+    "removeComments": true,
+    "showLineNumbers": false,
+    "topFilesLength": 5
+  },
+  "include": [
+    "src/**/*.ts",
+    "prisma/schema.prisma",
+    "package.json",
+    "tsconfig.json"
+  ],
+  "ignore": {
+    "customPatterns": [
+      "dist/**",
+      "node_modules/**",
+      ".pnpm-store/**",
+      "prisma/migrations/**",
+      "prisma/generated/**",
+      "**/*.log",
+      "**/*.spec.ts",
+      "**/*.test.ts",
+      "docker-compose.override.yml",
+      "package-lock.json",
+      "yarn.lock",
+      "pnpm-lock.yaml"
+    ],
+    "useGitignore": true,
+    "useDefaultPatterns": true
+  }
+}
