@@ -1,5 +1,6 @@
 import { NestFactory } from '@nestjs/core';
 import { Logger, ValidationPipe } from '@nestjs/common';
+import helmet from 'helmet';
 import { AppModule } from './app.module';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
 import { ResponseInterceptor } from './common/interceptors/response.interceptor';
@@ -10,6 +11,19 @@ async function bootstrap(): Promise<void> {
 
   app.setGlobalPrefix('api/v1');
 
+  // ── Seguridad: Helmet ─────────────────────────────────────────────────────
+  // crossOriginResourcePolicy: cross-origin permite que el storefront (origen
+  // distinto) cargue recursos sin bloqueo adicional de CORP.
+  app.use(
+    helmet({
+      crossOriginResourcePolicy: { policy: 'cross-origin' },
+    }),
+  );
+
+  // ── Seguridad: CORS ───────────────────────────────────────────────────────
+  // ecommerce-back sirve al storefront público — si no hay origenes explícitos
+  // se refleja el Origin del request (origin: true). Distinto a real-back donde
+  // el wildcard + credentials es inaceptable porque maneja tokens de identidad.
   const rawOrigins = process.env['ALLOWED_ORIGINS'] ?? '';
   const allowedOrigins = rawOrigins.split(',').map((o) => o.trim()).filter(Boolean);
 
@@ -31,6 +45,7 @@ async function bootstrap(): Promise<void> {
 
   logger.log(`🛍️  real-ecommerce-back en http://0.0.0.0:${port}/api/v1`);
   logger.log(`🔥 Firebase Auth SSO activo (rutas @Public() lo saltan)`);
+  logger.log(`🛡️  Helmet + ThrottlerGuard (30 req/min) activos`);
 }
 
 bootstrap();

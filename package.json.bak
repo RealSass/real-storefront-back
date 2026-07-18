@@ -57,7 +57,6 @@
     "@types/jest": "catalog:backend",
     "@types/node": "catalog:backend",
     "@types/supertest": "catalog:backend",
-    "@types/uuid": "catalog:backend",
     "eslint": "catalog:backend",
     "eslint-config-prettier": "catalog:backend",
     "eslint-plugin-prettier": "catalog:backend",
@@ -75,19 +74,11 @@
     "typescript-eslint": "catalog:backend"
   },
   "jest": {
-    "moduleFileExtensions": [
-      "js",
-      "json",
-      "ts"
-    ],
+    "moduleFileExtensions": ["js", "json", "ts"],
     "rootDir": "src",
     "testRegex": ".*\\.spec\\.ts$",
-    "transform": {
-      "^.+\\.(t|j)s$": "ts-jest"
-    },
-    "collectCoverageFrom": [
-      "**/*.(t|j)s"
-    ],
+    "transform": { "^.+\\.(t|j)s$": "ts-jest" },
+    "collectCoverageFrom": ["**/*.(t|j)s"],
     "coverageDirectory": "../coverage",
     "testEnvironment": "node"
   }
